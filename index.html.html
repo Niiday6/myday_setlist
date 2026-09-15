@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MY DREAM SETLIST 產生器</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    body {
+      background-color: #121212;
+      color: #ffffff;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    h1 {
+      margin-bottom: 8px;
+      font-size: 26px;
+      color: #00ffcc;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    }
+
+    p.subtitle {
+      font-size: 14px;
+      color: #ddd;
+      margin-bottom: 20px;
+      text-shadow: 0 1px 5px rgba(0,0,0,0.5);
+    }
+
+    .controls {
+      margin-bottom: 20px;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .input-text {
+      background-color: #333;
+      color: #fff;
+      border: 1px solid #555;
+      padding: 10px 15px;
+      font-size: 14px;
+      border-radius: 20px;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .input-text:focus {
+      border-color: #00ffcc;
+      box-shadow: 0 0 8px rgba(0, 255, 204, 0.4);
+    }
+
+    .btn {
+      background-color: #00ffcc;
+      color: #000;
+      border: none;
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: bold;
+      border-radius: 20px;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+      transition: all 0.2s ease;
+    }
+
+    .btn:hover {
+      transform: scale(1.05);
+      background-color: #00e6b8;
+    }
+
+    .btn-secondary {
+      background-color: #333;
+      color: #fff;
+      border: 1px solid #555;
+    }
+
+    .btn-secondary:hover {
+      background-color: #444;
+    }
+
+    /* 9:16 畫布卡片 */
+    #playlist-card {
+      width: 360px;
+      height: 640px; /* 9:16 比例 */
+      background: linear-gradient(135deg, rgba(26,26,46,0.95) 0%, rgba(22,33,62,0.95) 50%, rgba(15,52,96,0.95) 100%);
+      background-size: cover;
+      background-position: center;
+      backdrop-filter: blur(10px);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    /* 背景遮罩 */
+    #playlist-card::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.35);
+      border-radius: 16px;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .card-header, .song-grid, .card-footer {
+      position: relative;
+      z-index: 1;
+    }
+
+    .card-header {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    .card-header h2 {
+      font-size: 18px;
+      letter-spacing: 2px;
+      color: #ffffff;
+    }
+
+    .card-header p {
+      font-size: 10px;
+      color: #00ffcc;
+      letter-spacing: 1px;
+    }
+
+    /* 30 個選單雙欄排版 */
+    .song-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: repeat(15, 1fr);
+      gap: 3px 6px;
+      flex-grow: 1;
+    }
+
+    .song-item {
+      display: flex;
+      align-items: center;
+      background: rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(4px);
+      border-radius: 4px;
+      padding: 2px 4px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .song-num {
+      font-size: 10px;
+      font-weight: bold;
+      color: #00ffcc;
+      width: 16px;
+      flex-shrink: 0;
+    }
+
+    /* 歌名可打字搜尋輸入框 */
+    .song-input {
+      width: calc(100% - 16px);
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 2px;
+      color: #ffffff;
+      font-size: 9px;
+      padding: 2px 4px;
+      outline: none;
+    }
+
+    .song-input::placeholder {
+      color: rgba(255,255,255,0.4);
+    }
+
+    /* 導出時顯示的純文字標籤 */
+    .export-text {
+      display: none;
+      font-size: 9px;
+      color: #ffffff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      width: calc(100% - 16px);
+      text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+      padding-left: 2px;
+    }
+
+    /* 導出狀態樣式 */
+    .exporting .song-input {
+      display: none !important;
+    }
+
+    .exporting .export-text {
+      display: block !important;
+    }
+
+    .card-footer {
+      text-align: center;
+      font-size: 8px;
+      color: #aaa;
+      margin-top: 6px;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+    }
+  </style>
+</head>
+<body>
+
+  <h1>MY DREAM SETLIST</h1>
+  <p class="subtitle">自訂歌單</p>
+
+  <div class="controls">
+    <!-- 自訂創作者名稱輸入框 -->
+    <input type="text" id="authorInput" class="input-text" placeholder="輸入名字 / ID" value="Input ID" oninput="updateFooter()">
+
+    <!-- 上傳自訂圖片作為 9:16 卡片背景 -->
+    <button class="btn btn-secondary" onclick="document.getElementById('cardBgInput').click()">Upload Background</button>
+    <input type="file" id="cardBgInput" accept="image/*" style="display: none;" onchange="uploadCardBackground(event)">
+    
+    <button class="btn" onclick="downloadImage()">📸 Export </button>
+  </div>
+
+  <!-- 9:16 歌單卡片主體 -->
+  <div id="playlist-card">
+    <div class="card-header">
+      <h2>MYDAY WISH</h2>
+      <p>我嘅人生歌單</p>
+    </div>
+
+    <div class="song-grid" id="songGrid">
+      <!-- 30 個選項將由 JavaScript 自動生成 -->
+    </div>
+
+    <div class="card-footer" id="cardFooter">
+      CREATED BY <span id="authorName">HK-MYDAY</span> @<span id="footerDate"></span>
+    </div>
+  </div>
+
+  <!-- 全域歌名選單 (datalist) 供輸入框搜尋選取 -->
+  <datalist id="song-list-data"></datalist>
+
+  <script>
+    // 完整歌名陣列
+    const songList = [
+      "Freely (Free하게)",
+      "Out of My Mind (이상하게 계속 이래)",
+      "Congratulations",
+      "Habits (버릇이 됐어)",
+      "Like That Sun (태양처럼)",
+      "Colors",
+      "First Time",
+      "Blood",
+      "Letting Go (놓아 놓아 놓아)",
+      "Sing Me",
+      "Wish (바래)",
+      "Hunt",
+      "Lean on Me (오늘은 내게)",
+      "I Smile (반드시 웃는다)",
+      "Man in a Movie",
+      "I Wait (아 왜)",
+      "How Can I Say (어떻게 말해)",
+      "Letting Go (놓아 놓아 놓아; Rebooted Version)",
+      "I Would (그럴 텐데)",
+      "Goodbye Winter (겨울이 간다)",
+      "I'm Serious (장난 아닌데)",
+      "Say Wow",
+      "Dance Dance",
+      "My Day",
+      "You Were Beautiful (예뻤어)",
+      "Congratulations (Final Version)",
+      "Better Better",
+      "I Like You (좋아합니다)",
+      "What Can I Do (좋은걸 어떡해)",
+      "I'll Remember (남겨둘게)",
+      "Whatever! (놀래!)",
+      "Be Lazy",
+      "Hi Hello",
+      "I Loved You",
+      "When You Love Someone (그렇더라고요)",
+      "All Alone",
+      "Pouring (쏟아진다)",
+      "I Need Somebody (누군가 필요해)",
+      "I'll Try (노력해볼게)",
+      "WARNING!",
+      "Shoot Me",
+      "Somehow (어쩌다 보니)",
+      "Feeling Good",
+      "Talking to (혼잣말)",
+      "Still (원하니까)",
+      "Live Your Life",
+      "Breaking Down",
+      "Stop The Rain",
+      "Say Hello",
+      "Everybody Rock!",
+      "I Just",
+      "Nobody Knows",
+      "Falling",
+      "If ～また逢えたら～",
+      "Baby, it's okay",
+      "Hurt Road (아픈 길)",
+      "Days Gone By (행복했던 날들이었다)",
+      "Headache (두통)",
+      "121U",
+      "So Cool",
+      "Marathon",
+      "Beautiful Feeling",
+      "For Me",
+      "Time of Our Life (한 페이지가 될 수 있게)",
+      "How to Love",
+      "Wanna Go Back (돌아갈래요)",
+      "Cover (포장)",
+      "Best Part",
+      "Deep in love",
+      "Sweet Chaos",
+      "EMERGENCY",
+      "Rescue Me",
+      "365247",
+      "About Now (지금쯤)",
+      "OUCH (아야야)",
+      "Not Fine (나빠)",
+      "Stop Talking (막말)",
+      "Not Mine",
+      "Like a Flowing Wind (마치 흘러가는 바람처럼)",
+      "Finale",
+      "君がいたから (If You)",
+      "Day and Night",
+      "Zombie",
+      "Tick Tock",
+      "Love me or Leave me",
+      "STOP",
+      "1 to 10",
+      "Afraid",
+      "Landed (그렇게 너에게 도착했다)",
+      "Where the Sea Sleeps (파도가 넘어가는 길)",
+      "Thanks to -Interlude- (Feat. DENIMALZ 3)",
+      "To Fly (사랑, 이게 맞나 봐)",
+      "Forest -Outro- (Feat. DENIMALZ 3)",
+      "everyday we fight",
+      "You make Me",
+      "Healer",
+      "Only (둘도 아닌 하나)",
+      "above the clouds (구름 위에서)",
+      "ONE (무적)",
+      "so let's love (우리 앞으로 더 사랑하자)",
+      "WE (우린)",
+      "Right Through Me (뚫고 지나가요)",
+      "WALK (역대급)",
+      "All the Things You Wanted (네가 원했던 것들)",
+      "From the Ending of a Tragedy (비극의 결말에서)",
+      "Home Alone (나 홀로 집에)",
+      "LOVE PARADE",
+      "Guard You (끝까지 안아 줄게)",
+      "Best Song (베스트 송)",
+      "Not Gonna Love (사랑은 얼어 죽을)",
+      "Microphone (Feat. Down)",
+      "Want to Love You",
+      "Goodnight, Dear (잘 자라 내 사람아)",
+      "Come as You Are (그대로 와 줘요)",
+      "Out of the Blue (문득; Feat. Song Heejin)",
+      "Voicemail (안녕, 잘 가)",
+      "A Journey (행운을 빌어 줘)",
+      "Walk with Me (우리 더 걸을까)",
+      "Strangers (한 걸음)",
+      "The Microcosm (외딴섬의 외토리)",
+      "Unrequited Love (짝사랑)",
+      "Lasting Memory (그녀 속삭임의 답)",
+      "You Look Better than Me (네가 그리워질 거야)",
+      "Novel (소설 속의 등장인물)",
+      "Pieces (언젠가 봄은 올 거야)",
+      "Waited (오늘만을 너만을 이날을)",
+      "nothing but (이것밖에는 없다)",
+      "let it be summer",
+      "Dreamer (꿈꾼)",
+      "Bungee Jumping",
+      "natural",
+      "STRANGE",
+      "SOUL (Feat. CHOILB)",
+      "playground",
+      "babo",
+      "what is...",
+      "Welcome to the Show",
+      "HAPPY",
+      "The Power of Love",
+      "Get The Hell Out (널 제외한 나의 뇌)",
+      "Sad Ending (나만 슬픈 엔딩)",
+      "Let Me Love You (사랑하게 해주라)",
+      "didn't know (그게 너의 사랑인지 몰랐어)",
+      "Monster (괴물)",
+      "Melt Down (녹아내려요)",
+      "She Smiled (그녀가 웃었다)",
+      "Shxtty Game (망겜)",
+      "Help Me Rock&Roll (도와줘요 Rock&Roll)",
+      "COUNTER",
+      "I'm Fine",
+      "Still There (아직 거기 살아)",
+      "Dream Bus (꿈의 버스)",
+      "INSIDE OUT",
+      "Sun, Stay Asleep (해야 뜨지 말아 줘)",
+      "Disco Day (디스코 데이)",
+      "My Way (마이 웨이)",
+      "Before the Stars (별들 앞에서)",
+      "Take All My Heart (테이크 올 마이 하特)",
+      "Dream Rider (날아라! 드림라이더)",
+      "So It's the End (드디어 끝나갑니다)",
+      "Our Season (우리의 계절)",
+      "Wish (소원)",
+      "Toxic Love",
+      "Highs and Lows (사랑병동)",
+      "Already Grown Up (어른이 되어 버렸다)",
+      "Up All Night",
+      "Step by Step",
+      "Hold My Love (백만송이는 아니지만)",
+      "Piano (피아노)",
+      "Marionette",
+      "Shut The Door (Title track)",
+      "F world",
+      "Hey Honey",
+      "음원가 Anthem",
+      "SPIKE",
+      "Yonge St.",
+      "million reasons",
+      "우리가 헤어질 100가지 이유 (A Hundred Whys for Goodbye, with JINJOO of DNCE)",
+      "Drivin' into Hell",
+      "whatever",
+      "Goodbye, Love",
+      "집으로 향한다 (Heading Home)",
+      "안개꽃 (Gypsophila)",
+      "작업실에서 커피를 (Ordinary Days)"
+    ];
+
+    // 初始化 datalist 歌名選單
+    const datalist = document.getElementById('song-list-data');
+    songList.forEach(song => {
+      const option = document.createElement('option');
+      option.value = song;
+      datalist.appendChild(option);
+    });
+
+    const gridContainer = document.getElementById('songGrid');
+
+    // 建立 30 個可搜尋/選取的歌名輸入框
+    for (let i = 1; i <= 30; i++) {
+      const item = document.createElement('div');
+      item.className = 'song-item';
+      const numStr = i < 10 ? `0${i}` : `${i}`;
+
+      item.innerHTML = `
+        <span class="song-num">${numStr}</span>
+        <input type="text" list="song-list-data" class="song-input" id="song-input-${i}" placeholder="搜尋或揀歌曲" oninput="updateExportText(${i})">
+        <span class="export-text" id="export-text-${i}">-</span>
+      `;
+      gridContainer.appendChild(item);
+    }
+
+    function updateExportText(index) {
+      const inputVal = document.getElementById(`song-input-${index}`).value.trim();
+      const exportText = document.getElementById(`export-text-${index}`);
+      exportText.textContent = inputVal || "-";
+    }
+
+    // 上傳圖片作為卡片背景
+    function uploadCardBackground(event) {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const card = document.getElementById('playlist-card');
+          card.style.backgroundImage = `url('${e.target.result}')`;
+        }
+        reader.readAsDataURL(file);
+      }
+    }
+
+    // 高清導出 9:16 圖片功能
+    function downloadImage() {
+      const card = document.getElementById('playlist-card');
+      
+      card.classList.add('exporting');
+
+      html2canvas(card, {
+        scale: 3,
+        useCORS: true,
+        backgroundColor: null
+      }).then(canvas => {
+        const link = document.createElement('a');
+        link.download = 'My_Dream_Setlist.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        
+        card.classList.remove('exporting');
+      });
+    }
+
+    // 自動更新 Footer 名字與日期 (Format: DD/MM/YYYY)
+    function updateFooter() {
+      const inputVal = document.getElementById('authorInput').value.trim();
+      document.getElementById('authorName').textContent = inputVal || "HK-MYDAY";
+
+      const today = new Date();
+      const day = String(today.getDate()).padStart(2, '0');
+      const month = String(today.getMonth() + 1).padStart(2, '0');
+      const year = today.getFullYear();
+      
+      document.getElementById('footerDate').textContent = `${day}/${month}/${year}`;
+    }
+
+    // 頁面載入時執行初始化
+    updateFooter();
+  </script>
+</body>
+</html>
